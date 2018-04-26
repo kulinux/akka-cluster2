@@ -25,13 +25,13 @@ class Node {
   def createSystem(): ActorSystem = {
 
     try {
-      ActorSystem.create( "poc" )
+      val config = ConfigFactory.load()
+      ActorSystem.create(  config.getString("clustering.cluster.name"), config )
     } catch {
       case be: ChannelException => {
         val config = ConfigFactory.parseString("akka.remote.netty.tcp.port=0").
           withFallback(ConfigFactory.load())
-        ActorSystem.create( "poc", config )
-
+        ActorSystem.create(  config.getString("clustering.cluster.name"), config )
       }
     }
   }
