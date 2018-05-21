@@ -5,6 +5,9 @@ import akka.cluster.Cluster
 import akka.cluster.pubsub.DistributedPubSub
 import akka.cluster.pubsub.DistributedPubSubMediator.Publish
 import com.typesafe.config.ConfigFactory
+import kamon.Kamon
+import kamon.prometheus.PrometheusReporter
+import kamon.zipkin.ZipkinReporter
 import org.jboss.netty.channel.ChannelException
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -20,7 +23,9 @@ class Node {
   //val cluster = Cluster(system)
   //cluster.join(cluster.selfAddress)
 
-  val countParter = system.actorOf(CountPartner.props(), "CountPartner")
+  1 to 10 foreach { i =>
+    val countParter = system.actorOf(CountPartner.props(), "CountPartner" + i)
+  }
 
   def createSystem(): ActorSystem = {
 
@@ -38,6 +43,9 @@ class Node {
 }
 
 object Main extends App {
+  Kamon.addReporter(new PrometheusReporter())
+  Kamon.addReporter(new ZipkinReporter())
+
   val node = new Node()
 }
 
@@ -58,9 +66,15 @@ class CountPartner extends Actor with ActorLogging {
   mediator ! Subscribe("content", self)
 
   var counter = 0
+  var globalCounter = 0
+
 
   override def receive: Receive = {
     case msg: FindPartners => {
+      globalCounter = globalCounter + 1
+      if(globalCounter % 10 == 0 ) {
+        1 to 100 foreach { _ => mediator ! Publish("content", TocToc(self)) }
+      }
       log.info(s"find $counter, find again")
       counter = 0
       mediator ! Publish("content", TocToc(self))
@@ -80,7 +94,7 @@ class CountPartner extends Actor with ActorLogging {
     val cancellable =
       context.system.scheduler.schedule(
         0 seconds,
-        10 seconds,
+        1 seconds,
         self,
         FindPartners() )
 
